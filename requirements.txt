@@ -1,0 +1,6 @@
+albumentations>=2.0.0
+numpy>=1.24
+opencv-python-headless>=4.9
+PyYAML>=6.0
+rich>=13.7
+typer>=0.12

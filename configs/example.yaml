@@ -1,0 +1,53 @@
+extensions: [jpg, jpeg, png, webp]
+
+output:
+  samples_per_image: 150
+  format: jpeg
+  suffix: "_aug{index:03d}"
+  preserve_tree: true
+  overwrite: false
+  jpeg_quality: 94
+  png_compression: 3
+
+runtime:
+  workers: null
+  chunksize: 16
+
+transforms:
+  - name: Resize
+    params:
+      height: 512
+      width: 512
+      p: 1.0
+
+  - name: HorizontalFlip
+    params:
+      p: 0.5
+
+  - name: Rotate
+    params:
+      limit: [-12, 12]
+      border_mode: 2
+      p: 0.35
+
+  - name: RandomBrightnessContrast
+    params:
+      brightness_limit: [-0.15, 0.15]
+      contrast_limit: [-0.12, 0.12]
+      p: 0.45
+
+  - name: GaussianBlur
+    params:
+      blur_limit: [3, 5]
+      p: 0.2
+
+  - name: GaussNoise
+    params:
+      std_range: [0.03, 0.10]
+      p: 0.25
+
+  - name: SaltAndPepper
+    params:
+      amount: [0.005, 0.025]
+      salt_vs_pepper: [0.45, 0.55]
+      p: 0.15

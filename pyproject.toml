@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "image-augmentation-cli"
+version = "0.1.0"
+description = "High-throughput CLI tool for image dataset augmentation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "albumentations>=2.0.0",
+  "numpy>=1.24",
+  "opencv-python-headless>=4.9",
+  "PyYAML>=6.0",
+  "rich>=13.7",
+  "typer>=0.12",
+]
+
+[project.scripts]
+imgaug = "image_aug_cli.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.hatch.build.targets.wheel]
+packages = ["image_aug_cli"]
