@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m pip install -e .
+
+      - name: Validate import and syntax
+        run: |
+          python -m compileall image_aug_cli
+          python - <<'PY'
+          from image_aug_cli.config import load_config
+          from pathlib import Path
+          config = load_config(Path("configs/example.yaml"))
+          assert config.output.samples_per_image >= 1
+          assert any(transform.name == "ElasticTransform" for transform in config.transforms)
+          PY
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+      - name: Attach distributions to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

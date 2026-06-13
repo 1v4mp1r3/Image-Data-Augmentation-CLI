@@ -1,13 +1,12 @@
 extensions: [jpg, jpeg, png, webp]
 
 output:
-  samples_per_image: 150
+  samples_per_image: 2
   format: jpeg
   suffix: "_aug{index:03d}"
   preserve_tree: true
   overwrite: false
   jpeg_quality: 94
-  png_compression: 3
 
 runtime:
   workers: null
@@ -15,9 +14,20 @@ runtime:
 
 annotations:
   yolo:
-    enabled: false
+    enabled: true
+    labels_dir: labels
+    output_labels_dir: labels_aug
+    allow_missing: false
+    min_visibility: 0.15
+    min_area: 8
+    clip: true
+    filter_invalid_bboxes: true
   masks:
-    enabled: false
+    enabled: true
+    masks_dir: masks
+    output_masks_dir: masks_aug
+    mask_extension: png
+    allow_missing: false
 
 transforms:
   - name: Resize
@@ -30,37 +40,20 @@ transforms:
     params:
       p: 0.5
 
-  - name: Rotate
-    params:
-      limit: [-12, 12]
-      border_mode: 2
-      p: 0.35
-
   - name: ElasticTransform
     params:
       alpha: 35
       sigma: 6
       border_mode: 2
-      p: 0.2
+      p: 0.25
 
   - name: RandomBrightnessContrast
     params:
-      brightness_limit: [-0.15, 0.15]
+      brightness_limit: [-0.12, 0.12]
       contrast_limit: [-0.12, 0.12]
-      p: 0.45
-
-  - name: GaussianBlur
-    params:
-      blur_limit: [3, 5]
-      p: 0.2
+      p: 0.4
 
   - name: GaussNoise
     params:
-      std_range: [0.03, 0.10]
+      std_range: [0.02, 0.08]
       p: 0.25
-
-  - name: SaltAndPepper
-    params:
-      amount: [0.005, 0.025]
-      salt_vs_pepper: [0.45, 0.55]
-      p: 0.15

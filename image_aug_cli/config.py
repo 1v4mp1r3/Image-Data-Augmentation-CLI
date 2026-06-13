@@ -39,10 +39,38 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True)
+class YoloConfig:
+    enabled: bool = False
+    labels_dir: str | None = None
+    output_labels_dir: str | None = None
+    allow_missing: bool = True
+    min_area: float = 0.0
+    min_visibility: float = 0.0
+    clip: bool = True
+    filter_invalid_bboxes: bool = True
+
+
+@dataclass(frozen=True)
+class MaskConfig:
+    enabled: bool = False
+    masks_dir: str | None = None
+    output_masks_dir: str | None = None
+    mask_extension: str = "png"
+    allow_missing: bool = True
+
+
+@dataclass(frozen=True)
+class AnnotationConfig:
+    yolo: YoloConfig = field(default_factory=YoloConfig)
+    masks: MaskConfig = field(default_factory=MaskConfig)
+
+
+@dataclass(frozen=True)
 class AugmentConfig:
     transforms: tuple[TransformSpec, ...]
     output: OutputConfig = field(default_factory=OutputConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
+    annotations: AnnotationConfig = field(default_factory=AnnotationConfig)
     extensions: tuple[str, ...] = DEFAULT_EXTENSIONS
 
     @classmethod
@@ -57,8 +85,10 @@ class AugmentConfig:
         transforms = tuple(_parse_transform(item) for item in raw_transforms)
         output = _parse_dataclass(OutputConfig, raw.get("output", {}), "output")
         runtime = _parse_dataclass(RuntimeConfig, raw.get("runtime", {}), "runtime")
+        annotations = _parse_annotations(raw.get("annotations", {}))
         _validate_output(output)
         _validate_runtime(runtime)
+        _validate_annotations(annotations)
 
         extensions = raw.get("extensions", DEFAULT_EXTENSIONS)
         if not isinstance(extensions, (list, tuple)) or not extensions:
@@ -73,6 +103,7 @@ class AugmentConfig:
             transforms=transforms,
             output=output,
             runtime=runtime,
+            annotations=annotations,
             extensions=normalized_extensions,
         )
 
@@ -133,6 +164,24 @@ def _parse_dataclass(cls: type[Any], raw: Any, section: str) -> Any:
         raise ConfigError(f"Invalid '{section}' section: {exc}") from exc
 
 
+def _parse_annotations(raw: Any) -> AnnotationConfig:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ConfigError("'annotations' must be a mapping.")
+
+    allowed = {"yolo", "masks"}
+    unknown = set(raw) - allowed
+    if unknown:
+        unknown_list = ", ".join(sorted(unknown))
+        raise ConfigError(f"Unknown keys in 'annotations': {unknown_list}")
+
+    return AnnotationConfig(
+        yolo=_parse_dataclass(YoloConfig, raw.get("yolo", {}), "annotations.yolo"),
+        masks=_parse_dataclass(MaskConfig, raw.get("masks", {}), "annotations.masks"),
+    )
+
+
 def _validate_output(output: OutputConfig) -> None:
     if output.samples_per_image < 1:
         raise ConfigError("'output.samples_per_image' must be at least 1.")
@@ -151,3 +200,15 @@ def _validate_runtime(runtime: RuntimeConfig) -> None:
         raise ConfigError("'runtime.workers' must be at least 1.")
     if runtime.chunksize < 1:
         raise ConfigError("'runtime.chunksize' must be at least 1.")
+
+
+def _validate_annotations(annotations: AnnotationConfig) -> None:
+    yolo = annotations.yolo
+    if yolo.min_area < 0:
+        raise ConfigError("'annotations.yolo.min_area' must be non-negative.")
+    if yolo.min_visibility < 0 or yolo.min_visibility > 1:
+        raise ConfigError("'annotations.yolo.min_visibility' must be between 0 and 1.")
+
+    mask_extension = annotations.masks.mask_extension
+    if not isinstance(mask_extension, str) or not mask_extension.strip():
+        raise ConfigError("'annotations.masks.mask_extension' must be a non-empty string.")

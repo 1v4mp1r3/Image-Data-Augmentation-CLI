@@ -18,14 +18,20 @@ ALLOWED_TRANSFORMS = {
     "RandomRotate90",
     "Rotate",
     "Affine",
+    "ElasticTransform",
+    "GridDistortion",
+    "OpticalDistortion",
     "GaussianBlur",
     "MedianBlur",
     "MotionBlur",
     "GaussNoise",
     "SaltAndPepper",
     "RandomBrightnessContrast",
+    "RandomGamma",
+    "CLAHE",
     "ColorJitter",
     "HueSaturationValue",
+    "Sharpen",
 }
 
 
@@ -49,7 +55,18 @@ def build_pipeline(config: AugmentConfig) -> A.Compose:
         except Exception as exc:  # Albumentations raises pydantic/value errors here.
             raise ConfigError(f"Invalid parameters for transform '{spec.name}': {exc}") from exc
 
-    return A.Compose(transforms, strict=True)
+    bbox_params = None
+    if config.annotations.yolo.enabled:
+        bbox_params = A.BboxParams(
+            format="yolo",
+            label_fields=["class_labels"],
+            min_area=config.annotations.yolo.min_area,
+            min_visibility=config.annotations.yolo.min_visibility,
+            clip=config.annotations.yolo.clip,
+            filter_invalid_bboxes=config.annotations.yolo.filter_invalid_bboxes,
+        )
+
+    return A.Compose(transforms, bbox_params=bbox_params, strict=True)
 
 
 def _normalize_params(value: Any) -> Any:

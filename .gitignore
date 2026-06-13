@@ -17,4 +17,6 @@ build/
 samples/
 augmented/
 my_photos/
+__smoke/
+__smoke_out/
 *.tmp

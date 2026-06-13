@@ -15,6 +15,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from image_aug_cli.annotations import read_mask, read_yolo_labels, write_mask, write_yolo_labels
 from image_aug_cli.config import AugmentConfig
 from image_aug_cli.io import build_output_path, iter_images, read_rgb_image, write_rgb_image
 from image_aug_cli.pipeline import build_pipeline
@@ -113,6 +114,13 @@ def _process_one_image(task: tuple[str, str, str]) -> ImageResult:
 
     try:
         image = read_rgb_image(src_path)
+        yolo_labels = None
+        mask_data = None
+        if config.annotations.yolo.enabled:
+            yolo_labels = read_yolo_labels(src_path, input_dir, config.annotations)
+        if config.annotations.masks.enabled:
+            mask_data = read_mask(src_path, input_dir, config.annotations)
+
         written = skipped = 0
 
         for index in range(config.output.samples_per_image):
@@ -127,8 +135,34 @@ def _process_one_image(task: tuple[str, str, str]) -> ImageResult:
                 skipped += 1
                 continue
 
-            result = _WORKER_PIPELINE(image=image)
+            call_args: dict[str, Any] = {"image": image}
+            if config.annotations.yolo.enabled and yolo_labels is not None:
+                call_args["bboxes"] = yolo_labels.bboxes
+                call_args["class_labels"] = yolo_labels.class_labels
+            if mask_data is not None and mask_data.exists:
+                call_args["mask"] = mask_data.image
+
+            result = _WORKER_PIPELINE(**call_args)
             write_rgb_image(dst_path, result["image"], config.output)
+            if config.annotations.yolo.enabled and yolo_labels is not None and yolo_labels.exists:
+                write_yolo_labels(
+                    src_path=src_path,
+                    input_dir=input_dir,
+                    dst_image_path=dst_path,
+                    output_dir=output_dir,
+                    config=config.annotations.yolo,
+                    bboxes=result["bboxes"],
+                    class_labels=result["class_labels"],
+                )
+            if mask_data is not None and mask_data.exists:
+                write_mask(
+                    src_path=src_path,
+                    input_dir=input_dir,
+                    dst_image_path=dst_path,
+                    output_dir=output_dir,
+                    config=config.annotations.masks,
+                    mask=result["mask"],
+                )
             written += 1
 
         return ImageResult(source=str(src_path), written=written, skipped=skipped)
